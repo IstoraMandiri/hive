@@ -1,3 +1,5 @@
+## Uses pre-built Docker images. For testing our fork, use Dockerfile.git instead:
+##   ./hive --client core-geth --client.core-geth.dockerfile git
 ARG baseimage=etclabscore/core-geth
 ARG tag=latest
 

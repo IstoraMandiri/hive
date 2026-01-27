@@ -1,7 +1,8 @@
 ## Pulls core-geth from a git repository and builds it from source.
+## Default: IstoraMandiri/core-geth fork for ECIP testing
 
 FROM golang:1.22-alpine as builder
-ARG github=etclabscore/core-geth
+ARG github=IstoraMandiri/core-geth
 ARG tag=master
 ARG GOPROXY
 
