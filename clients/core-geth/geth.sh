@@ -65,6 +65,11 @@ else
     FLAGS="$FLAGS --networkid 1337"
 fi
 
+# Disable PoW verification for tests with NoProof seal engine
+if [ "$HIVE_SKIP_POW" != "" ]; then
+    FLAGS="$FLAGS --fakepow"
+fi
+
 # Handle any client mode or operation requests
 case "$HIVE_NODETYPE" in
     "" | full)
@@ -109,7 +114,7 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-    (cd /blocks && $geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL import --nocompaction `ls | sort -n`)
+    (cd /blocks && $geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL import `ls | sort -n`)
 else
     echo "Warning: blocks folder not found."
 fi
