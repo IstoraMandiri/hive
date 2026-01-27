@@ -1,9 +1,23 @@
-## Uses pre-built Docker images. For testing our fork, use Dockerfile.git instead:
-##   ./hive --client core-geth --client.core-geth.dockerfile git
-ARG baseimage=etclabscore/core-geth
-ARG tag=latest
+## Builds core-geth from source (IstoraMandiri/core-geth fork)
+## Override with: --client.core-geth.github=etclabscore/core-geth
 
-FROM $baseimage:$tag as builder
+FROM golang:1.22-alpine as builder
+ARG github=IstoraMandiri/core-geth
+ARG tag=master
+ARG GOPROXY
+
+ENV GOPROXY=${GOPROXY}
+
+RUN \
+  apk add --update bash curl jq git make gcc musl-dev                 \
+  ca-certificates linux-headers                                    && \
+  echo "Cloning: $github - $tag"                                   && \
+  git clone --depth 1 --branch $tag https://github.com/$github     && \
+  cd core-geth                                                     && \
+  make geth                                                        && \
+  cp build/bin/geth /usr/local/bin/geth                            && \
+  apk del go git make gcc musl-dev linux-headers                   && \
+  rm -rf /core-geth && rm -rf /var/cache/apk/*
 
 FROM alpine:latest
 RUN apk add --update bash curl jq
