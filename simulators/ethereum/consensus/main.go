@@ -24,6 +24,9 @@ func main() {
 		makeSuite("consensus", "BlockchainTests"),
 		makeSuite("legacy", "LegacyTests/Constantinople/BlockchainTests"),
 		makeSuite("legacy-cancun", "LegacyTests/Cancun/BlockchainTests"),
+		// ETC consensus suite: loads all test directories, filters to ETC-compatible
+		// forks (Frontier through Berlin), runs only against clients with "etc" role.
+		makeETCSuite("consensus-etc"),
 	}
 	client := hivesim.New()
 	for _, suite := range suites {
@@ -50,6 +53,110 @@ func makeSuite(name string, testsDirectory string) hivesim.Suite {
 		AlwaysRun: true,
 	})
 	return suite
+}
+
+// etcTestDirectories lists all test directories to scan for ETC-compatible tests.
+// Tests from all directories are combined into a single suite, with non-ETC forks
+// filtered out automatically.
+var etcTestDirectories = []string{
+	"BlockchainTests",
+	"LegacyTests/Constantinople/BlockchainTests",
+	"LegacyTests/Cancun/BlockchainTests",
+}
+
+func makeETCSuite(name string) hivesim.Suite {
+	suite := hivesim.Suite{
+		Name: name,
+		Description: "ETC consensus tests: runs all EVM blockchain tests from the official " +
+			"ethereum/tests repository, filtered to forks supported by Ethereum Classic " +
+			"(Frontier through Berlin/Magneto). Tests run against clients with the 'etc' " +
+			"role using chain ID 61.",
+	}
+	suite.Add(hivesim.TestSpec{
+		Name: "test file loader",
+		Description: "This is a meta-test. It loads blockchain test files from all test " +
+			"directories and launches tests for ETC-compatible forks only.",
+		Run:       runETCTestsLoader,
+		AlwaysRun: true,
+	})
+	return suite
+}
+
+// runETCTestsLoader loads blockchain test files from all test directories
+// and spawns tests for ETC clients only, filtering to ETC-compatible forks.
+func runETCTestsLoader(t *hivesim.T) {
+	allClients, err := t.Sim.ClientTypes()
+	if err != nil {
+		t.Fatal("can't get client types:", err)
+	}
+	var clientTypes []*hivesim.ClientDefinition
+	for _, c := range allClients {
+		if c.HasRole("etc") {
+			clientTypes = append(clientTypes, c)
+		}
+	}
+	if len(clientTypes) == 0 {
+		t.Log("no clients with 'etc' role found, skipping ETC tests")
+		return
+	}
+
+	parallelism := 16
+	if val, ok := os.LookupEnv("HIVE_PARALLELISM"); ok {
+		if p, err := strconv.Atoi(val); err != nil {
+			t.Logf("Warning: invalid HIVE_PARALLELISM value %q", val)
+		} else {
+			parallelism = p
+		}
+	}
+	t.Log("parallelism:", parallelism)
+
+	basePath, isset := os.LookupEnv("TESTPATH")
+	if !isset {
+		t.Fatal("$TESTPATH not set")
+	}
+
+	var wg sync.WaitGroup
+	var testCh = make(chan *testcase)
+	wg.Add(parallelism)
+	for i := 0; i < parallelism; i++ {
+		go func() {
+			defer wg.Done()
+			for test := range testCh {
+				t.Run(hivesim.TestSpec{
+					Name:        test.name,
+					Description: "Test source: " + testLink(test.filepath),
+					Run:         test.run,
+					AlwaysRun:   true,
+				})
+			}
+		}()
+	}
+
+	_, testPattern := t.Sim.TestPattern()
+	re := regexp.MustCompile(testPattern)
+
+	deliver := func(tc testcase) {
+		// Skip tests for forks not supported by ETC.
+		if _, ok := etcEnvForks[tc.blockTest.json.Network]; !ok {
+			return
+		}
+		tc.etcMode = true
+		for _, client := range clientTypes {
+			tc := tc // shallow copy
+			tc.clientType = client.Name
+			testCh <- &tc
+		}
+	}
+
+	// Load tests from all directories.
+	for _, dir := range etcTestDirectories {
+		fileRoot := filepath.Join(basePath, dir)
+		t.Log("loading ETC tests from:", dir)
+		loadTests(t, fileRoot, re, deliver)
+	}
+	close(testCh)
+
+	wg.Wait()
 }
 
 // runTestsLoader loads the blockchain test files and spawns the client tests.
@@ -172,12 +279,17 @@ type testcase struct {
 	clientType string
 	blockTest  BlockTest
 	filepath   string
+	etcMode    bool // use ETC fork definitions, chain ID 61, no DAO vote
 }
 
 // validate returns error if the test's chain rules are not supported.
 func (tc *testcase) validate() error {
 	net := tc.blockTest.json.Network
-	if _, exist := envForks[net]; !exist {
+	forks := envForks
+	if tc.etcMode {
+		forks = etcEnvForks
+	}
+	if _, exist := forks[net]; !exist {
 		return fmt.Errorf("network `%v` not defined in ruleset", net)
 	}
 	return nil
@@ -192,9 +304,19 @@ func (tc *testcase) run(t *hivesim.T) {
 	}
 
 	// update the parameters with test-specific stuff
-	env := hivesim.Params{
-		"HIVE_FORK_DAO_VOTE": "1",
-		"HIVE_CHAIN_ID":      "1",
+	var env hivesim.Params
+	if tc.etcMode {
+		// Use chain ID 1 because ethereum/tests vectors have transactions signed
+		// with chain ID 1. The ETC suite tests EVM/fork compatibility, not
+		// chain-specific replay protection.
+		env = hivesim.Params{
+			"HIVE_CHAIN_ID": "1",
+		}
+	} else {
+		env = hivesim.Params{
+			"HIVE_FORK_DAO_VOTE": "1",
+			"HIVE_CHAIN_ID":      "1",
+		}
 	}
 	tc.updateEnv(env)
 	genesisTarget := strings.Replace(genesis, root, "", 1)
@@ -247,7 +369,11 @@ func (tc *testcase) run(t *hivesim.T) {
 // updateEnv sets environment variables from the test
 func (tc *testcase) updateEnv(env hivesim.Params) {
 	// Environment variables for fork rules
-	forks := envForks[tc.blockTest.json.Network]
+	forkMap := envForks
+	if tc.etcMode {
+		forkMap = etcEnvForks
+	}
+	forks := forkMap[tc.blockTest.json.Network]
 	for k, v := range forks {
 		env[k] = fmt.Sprintf("%d", v)
 	}
