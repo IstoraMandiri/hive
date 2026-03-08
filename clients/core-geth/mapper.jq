@@ -128,9 +128,18 @@ def to_bool:
     "eip6780FTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
     "eip7516FTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
 
-    # ECIP-1121: Block-based activation of selected Cancun EIPs for ETC
+    # ECIP-1121: Block-based activation of selected Cancun+ EIPs for ETC
     "eip1153FBlock": env.HIVE_FORK_ECIP1121_EIP1153|to_int,
     "eip5656FBlock": env.HIVE_FORK_ECIP1121_EIP5656|to_int,
-    "eip6780FBlock": env.HIVE_FORK_ECIP1121_EIP6780|to_int
+    "eip6780FBlock": env.HIVE_FORK_ECIP1121_EIP6780|to_int,
+    "eip2537FBlock": env.HIVE_FORK_ECIP1121_EIP2537|to_int,
+    "eip7883FBlock": env.HIVE_FORK_ECIP1121_EIP7883|to_int,
+    "eip7825FBlock": env.HIVE_FORK_ECIP1121_EIP7825|to_int,
+    "eip7623FBlock": env.HIVE_FORK_ECIP1121_EIP7623|to_int,
+    "eip7934FBlock": env.HIVE_FORK_ECIP1121_EIP7934|to_int,
+    "eip2935FBlock": env.HIVE_FORK_ECIP1121_EIP2935|to_int,
+    "eip7910FBlock": env.HIVE_FORK_ECIP1121_EIP7910|to_int,
+    "eip7702FBlock": env.HIVE_FORK_ECIP1121_EIP7702|to_int,
+    "eip7951FBlock": env.HIVE_FORK_ECIP1121_EIP7951|to_int
   }|remove_empty
 }
