@@ -199,4 +199,18 @@ var etcEnvForks = map[string]map[string]int{
 		"HIVE_FORK_BERLIN":         5,
 		"HIVE_FORK_LONDON":         2000,
 	},
+	"ETC_ECIP1121": {
+		"HIVE_FORK_HOMESTEAD":      0,
+		"HIVE_FORK_TANGERINE":      0,
+		"HIVE_FORK_SPURIOUS":       0,
+		"HIVE_FORK_BYZANTIUM":      0,
+		"HIVE_FORK_CONSTANTINOPLE": 0,
+		"HIVE_FORK_PETERSBURG":     0,
+		"HIVE_FORK_ISTANBUL":       0,
+		"HIVE_FORK_BERLIN":         0,
+		"HIVE_FORK_LONDON":         2000,
+		"HIVE_FORK_ECIP1121_EIP1153": 0,
+		"HIVE_FORK_ECIP1121_EIP5656": 0,
+		"HIVE_FORK_ECIP1121_EIP6780": 0,
+	},
 }
